@@ -1,0 +1,166 @@
+show databases;
+create database IF NOT exists newdatabase;
+show databases;
+use newdatabase;
+
+CREATE TABLE Branch (
+  branch_name VARCHAR(100) PRIMARY KEY,
+  branch_city VARCHAR(100) NOT NULL,
+  assets DECIMAL(15,2) NOT NULL      
+);
+
+CREATE TABLE BankAccount (
+  accno INT PRIMARY KEY,
+  branch_name VARCHAR(100) NOT NULL,
+  balance DECIMAL(15,2) NOT NULL,
+  FOREIGN KEY (branch_name) REFERENCES Branch(branch_name)
+);
+
+CREATE TABLE BankCustomer (
+  customer_name VARCHAR(100) PRIMARY KEY,
+  customer_street VARCHAR(200),
+  customer_city VARCHAR(100)
+);
+
+CREATE TABLE Depositer (
+  customer_name VARCHAR(100) NOT NULL,
+  accno INT NOT NULL,
+  PRIMARY KEY (customer_name, accno),
+  FOREIGN KEY (customer_name) REFERENCES BankCustomer(customer_name),
+  FOREIGN KEY (accno) REFERENCES BankAccount(accno)
+);
+
+CREATE TABLE Loan (
+  loan_number INT PRIMARY KEY,
+  branch_name VARCHAR(100) NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  FOREIGN KEY (branch_name) REFERENCES Branch(branch_name)
+);
+
+
+INSERT INTO Branch(branch_name, branch_city, assets) VALUES
+('SBI_ResidencyRoad', 'Bengaluru', 12500000.00),
+('HDFC_MG_Road','Mumbai',20000000.00),
+('ICICI_ParkStreet','Kolkata',15000000.00),
+('AXIS_BakerStreet','Delhi',10000000.00),
+('PNB_StationRoad', 'Chennai',8000000.00);
+
+INSERT INTO BankAccount(accno, branch_name, balance) VALUES
+(1001,'SBI_ResidencyRoad',50000.00),
+(1002,'SBI_ResidencyRoad',75000.00),
+(1003,'HDFC_MG_Road',150000.00),
+(1004,'ICICI_ParkStreet',200000.00),
+(1005,'AXIS_BakerStreet',300000.00),
+(1006,'SBI_ResidencyRoad',120000.00),
+(1007,'PNB_StationRoad',90000.00),
+(1008,'HDFC_MG_Road',60000.00),
+(1009,'ICICI_ParkStreet',40000.00),
+(1010,'AXIS_BakerStreet',25000.00);
+
+INSERT INTO BankCustomer(customer_name, customer_street, customer_city) VALUES
+('Alice','1st Street','Bengaluru'),
+('Bob','2nd Avenue','Mumbai'),
+('Charlie','3rd Lane','Kolkata'),
+('David','4th Road','Bengaluru'),
+('Eva', '5th Street','Chennai'),
+('Fiona','6th Road','Delhi');
+
+INSERT INTO Depositer(customer_name, accno) VALUES
+('Alice',1001),
+('Alice',1002),
+('Alice',1006),
+('Bob', 1003),
+('Bob',1008),
+('Charlie',1004),
+('Charlie',1009),
+('David',1005),
+('Eva',1007),
+('Fiona',1010),
+('David',1010);
+
+INSERT INTO Loan(loan_number, branch_name, amount) VALUES
+(5001, 'SBI_ResidencyRoad',500000.00),
+(5002, 'SBI_ResidencyRoad',750000.00),
+(5003, 'HDFC_MG_Road',1000000.00),
+(5004, 'ICICI_ParkStreet',250000.00),
+(5005, 'AXIS_BakerStreet',300000.00),
+(5006, 'PNB_StationRoad',200000.00);
+
+
+SELECT * FROM Branch;
+SELECT * FROM BankAccount;
+SELECT * FROM BankCustomer;
+SELECT * FROM Depositer;
+SELECT * FROM Loan;
+
+SELECT
+  branch_name,
+  ROUND(assets / 100000.0, 2) AS "assets in lakhs"
+from Branch;
+
+SELECT
+  d.customer_name,
+  a.branch_name,
+  COUNT(DISTINCT d.accno) AS num_accounts_in_branch
+FROM Depositer d
+JOIN BankAccount a ON d.accno = a.accno
+GROUP BY d.customer_name, a.branch_name
+HAVING COUNT(DISTINCT d.accno) >= 2;
+
+CREATE VIEW Branch_Loan_Sum AS
+SELECT
+  branch_name,
+  SUM(amount) AS total_loan_amount
+from Loan
+group by branch_name;
+
+SELECT branch_name, total_loan_amount FROM Branch_Loan_Sum;
+
+SELECT d.customer_name
+FROM Depositer d
+JOIN BankAccount a ON d.accno = a.accno
+WHERE a.branch_name IN (
+  SELECT branch_name FROM Branch WHERE branch_city = 'Delhi'
+)
+GROUP BY d.customer_name
+HAVING COUNT(DISTINCT a.branch_name) = (
+  SELECT COUNT(*) FROM Branch WHERE branch_city = 'Delhi'
+);
+
+CREATE TABLE Borrower (
+  customer_name VARCHAR(100),
+  loan_number INT,
+  PRIMARY KEY (customer_name, loan_number),
+  FOREIGN KEY (customer_name) REFERENCES BankCustomer(customer_name),
+  FOREIGN KEY (loan_number) REFERENCES Loan(loan_number)
+);
+
+INSERT INTO Borrower VALUES
+('Alice',5001), 
+('Bob', 5003),  
+('Charlie',5004),  
+('David',5005),  
+('Eva', 5006); 
+
+SELECT DISTINCT br.customer_name
+FROM Borrower br
+WHERE br.customer_name NOT IN (SELECT customer_name FROM Depositer);
+
+SELECT branch_name, assets
+FROM Branch
+WHERE assets > ALL (
+  SELECT assets FROM Branch WHERE branch_city = 'Bengaluru'
+);
+
+DELETE FROM Depositer
+WHERE accno IN (
+  SELECT accno FROM BankAccount
+  WHERE branch_name IN (SELECT branch_name FROM Branch WHERE branch_city = 'Mumbai')
+)
+
+DELETE FROM BankAccount
+WHERE branch_name IN (SELECT branch_name FROM Branch WHERE branch_city = 'Mumbai');
+
+SELECT accno, balance AS old_balance, ROUND(balance * 1.05, 2) AS new_balance
+FROM BankAccount
+ORDER BY accno;
